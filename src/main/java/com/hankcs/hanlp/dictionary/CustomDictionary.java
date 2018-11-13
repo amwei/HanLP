@@ -30,7 +30,8 @@ import java.util.*;
 import static com.hankcs.hanlp.utility.Predefine.logger;
 
 /**
- * 用户自定义词典
+ * 用户自定义词典<br>
+ *     注意自定义词典的动态增删改不是线程安全的。
  *
  * @author He Han
  */
@@ -154,8 +155,14 @@ public class CustomDictionary
             }
             BufferedReader br = new BufferedReader(new InputStreamReader(IOUtil.newInputStream(path), "UTF-8"));
             String line;
+            boolean firstLine = true;
             while ((line = br.readLine()) != null)
             {
+                if (firstLine)
+                {
+                    line = IOUtil.removeUTF8BOM(line);
+                    firstLine = false;
+                }
                 String[] param = line.split(splitter);
                 if (param[0].length() == 0) continue;   // 排除空行
                 if (HanLP.Config.Normalization) param[0] = CharTable.convert(param[0]); // 正规化
@@ -295,6 +302,10 @@ public class CustomDictionary
     {
         try
         {
+            if (isDicNeedUpdate(path))
+            {
+                return false;
+            }
             ByteArray byteArray = ByteArray.createByteArray(path + Predefine.BIN_EXT);
             if (byteArray == null) return false;
             int size = byteArray.nextInt();
@@ -329,6 +340,38 @@ public class CustomDictionary
             return false;
         }
         return true;
+    }
+
+    /**
+     * 获取本地词典更新状态
+     * @return true 表示本地词典比缓存文件新，需要删除缓存
+     */
+    private static boolean isDicNeedUpdate(String mainPath)
+    {
+        if (HanLP.Config.IOAdapter != null &&
+            !HanLP.Config.IOAdapter.getClass().getName().contains("com.hankcs.hanlp.corpus.io.FileIOAdapter"))
+        {
+            return false;
+        }
+        String binPath = mainPath + Predefine.BIN_EXT;
+        File binFile = new File(binPath);
+        if (!binFile.exists())
+        {
+            return true;
+        }
+        long lastModified = binFile.lastModified();
+        String path[] = HanLP.Config.CustomDictionaryPath;
+        for (String p : path)
+        {
+            File f = new File(p);
+            if (f.exists() && f.lastModified() > lastModified)
+            {
+                IOUtil.deleteFile(binPath); // 删掉缓存
+                logger.info("已清除自定义词典缓存文件！");
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
@@ -515,6 +558,55 @@ public class CustomDictionary
         {
             processor.hit(searcher.begin, searcher.begin + searcher.length, searcher.value);
         }
+    }
+
+    /**
+     * 最长匹配
+     *
+     * @param text      文本
+     * @param processor 处理器
+     */
+    public static void parseLongestText(String text, AhoCorasickDoubleArrayTrie.IHit<CoreDictionary.Attribute> processor)
+    {
+        if (trie != null)
+        {
+            final int[] lengthArray = new int[text.length()];
+            final CoreDictionary.Attribute[] attributeArray = new CoreDictionary.Attribute[text.length()];
+            char[] charArray = text.toCharArray();
+            DoubleArrayTrie<CoreDictionary.Attribute>.Searcher searcher = dat.getSearcher(charArray, 0);
+            while (searcher.next())
+            {
+                lengthArray[searcher.begin] = searcher.length;
+                attributeArray[searcher.begin] = searcher.value;
+            }
+            trie.parseText(charArray, new AhoCorasickDoubleArrayTrie.IHit<CoreDictionary.Attribute>()
+            {
+                @Override
+                public void hit(int begin, int end, CoreDictionary.Attribute value)
+                {
+                    int length = end - begin;
+                    if (length > lengthArray[begin])
+                    {
+                        lengthArray[begin] = length;
+                        attributeArray[begin] = value;
+                    }
+                }
+            });
+            for (int i = 0; i < charArray.length;)
+            {
+                if (lengthArray[i] == 0)
+                {
+                    ++i;
+                }
+                else
+                {
+                    processor.hit(i, i + lengthArray[i], attributeArray[i]);
+                    i += lengthArray[i];
+                }
+            }
+        }
+        else
+            dat.parseLongestText(text, processor);
     }
 
     /**

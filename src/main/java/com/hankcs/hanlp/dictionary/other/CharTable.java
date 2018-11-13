@@ -12,6 +12,10 @@
 package com.hankcs.hanlp.dictionary.other;
 
 import com.hankcs.hanlp.HanLP;
+import com.hankcs.hanlp.corpus.document.sentence.Sentence;
+import com.hankcs.hanlp.corpus.document.sentence.word.CompoundWord;
+import com.hankcs.hanlp.corpus.document.sentence.word.IWord;
+import com.hankcs.hanlp.corpus.document.sentence.word.Word;
 import com.hankcs.hanlp.corpus.io.IOUtil;
 import com.hankcs.hanlp.utility.Predefine;
 
@@ -57,10 +61,19 @@ public class CharTable
             if (line.length() != 3) continue;
             CONVERT[line.charAt(0)] = CONVERT[line.charAt(2)];
         }
+        loadSpace();
         logger.info("正在缓存字符正规化表到" + binPath);
         IOUtil.saveObjectTo(CONVERT, binPath);
 
         return true;
+    }
+    
+    private static void loadSpace() {
+        for (int i = Character.MIN_CODE_POINT; i <= Character.MAX_CODE_POINT; i++) {
+            if (Character.isWhitespace(i) || Character.isSpaceChar(i)) {
+                CONVERT[i] = ' ';
+            }
+        }
     }
 
     private static boolean loadBin(String path)
@@ -101,16 +114,21 @@ public class CharTable
         return result;
     }
 
-    public static String convert(String charArray)
+    public static String convert(String sentence)
     {
-        assert charArray != null;
-        char[] result = new char[charArray.length()];
+        assert sentence != null;
+        char[] result = new char[sentence.length()];
+        convert(sentence, result);
+
+        return new String(result);
+    }
+
+    public static void convert(String charArray, char[] result)
+    {
         for (int i = 0; i < charArray.length(); i++)
         {
             result[i] = CONVERT[charArray.charAt(i)];
         }
-
-        return new String(result);
     }
 
     /**
@@ -123,6 +141,22 @@ public class CharTable
         for (int i = 0; i < charArray.length; i++)
         {
             charArray[i] = CONVERT[charArray[i]];
+        }
+    }
+
+    public static void normalize(Sentence sentence)
+    {
+        for (IWord word : sentence)
+        {
+            if (word instanceof CompoundWord)
+            {
+                for (Word w : ((CompoundWord) word).innerList)
+                {
+                    w.value = convert(w.value);
+                }
+            }
+            else
+                word.setValue(word.getValue());
         }
     }
 }

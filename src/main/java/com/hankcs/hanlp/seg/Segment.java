@@ -196,7 +196,7 @@ public abstract class Segment
      */
     protected static List<Vertex> combineByCustomDictionary(List<Vertex> vertexList)
     {
-        assert vertexList.size() > 2 : "vertexList至少包含 始##始 和 末##末";
+        assert vertexList.size() >= 2 : "vertexList至少包含 始##始 和 末##末";
         Vertex[] wordNet = new Vertex[vertexList.size()];
         vertexList.toArray(wordNet);
         // DAT合并
@@ -324,6 +324,56 @@ public abstract class Segment
             }
             wordNet[start] = new Vertex(sbTerm.toString(), value);
         }
+    }
+
+    /**
+     * 将一条路径转为最终结果
+     *
+     * @param vertexList
+     * @param offsetEnabled 是否计算offset
+     * @return
+     */
+    protected static List<Term> convert(List<Vertex> vertexList, boolean offsetEnabled)
+    {
+        assert vertexList != null;
+        assert vertexList.size() >= 2 : "这条路径不应当短于2" + vertexList.toString();
+        int length = vertexList.size() - 2;
+        List<Term> resultList = new ArrayList<Term>(length);
+        Iterator<Vertex> iterator = vertexList.iterator();
+        iterator.next();
+        if (offsetEnabled)
+        {
+            int offset = 0;
+            for (int i = 0; i < length; ++i)
+            {
+                Vertex vertex = iterator.next();
+                Term term = convert(vertex);
+                term.offset = offset;
+                offset += term.length();
+                resultList.add(term);
+            }
+        }
+        else
+        {
+            for (int i = 0; i < length; ++i)
+            {
+                Vertex vertex = iterator.next();
+                Term term = convert(vertex);
+                resultList.add(term);
+            }
+        }
+        return resultList;
+    }
+
+    /**
+     * 将节点转为term
+     *
+     * @param vertex
+     * @return
+     */
+    static Term convert(Vertex vertex)
+    {
+        return new Term(vertex.realWord, vertex.guessNature());
     }
 
     /**
@@ -531,9 +581,21 @@ public abstract class Segment
      */
     public List<List<Term>> seg2sentence(String text)
     {
+        return seg2sentence(text, true);
+    }
+
+    /**
+     * 分词断句 输出句子形式
+     *
+     * @param text     待分词句子
+     * @param shortest 是否断句为最细的子句（将逗号也视作分隔符）
+     * @return 句子列表，每个句子由一个单词列表组成
+     */
+    public List<List<Term>> seg2sentence(String text, boolean shortest)
+    {
         List<List<Term>> resultList = new LinkedList<List<Term>>();
         {
-            for (String sentence : SentencesUtil.toSentenceList(text))
+            for (String sentence : SentencesUtil.toSentenceList(text, shortest))
             {
                 resultList.add(segSentence(sentence.toCharArray()));
             }

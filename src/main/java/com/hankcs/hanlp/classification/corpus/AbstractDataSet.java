@@ -12,17 +12,16 @@
 package com.hankcs.hanlp.classification.corpus;
 
 import com.hankcs.hanlp.classification.models.AbstractModel;
-import com.hankcs.hanlp.classification.tokenizers.BigramTokenizer;
 import com.hankcs.hanlp.classification.tokenizers.HanLPTokenizer;
 import com.hankcs.hanlp.classification.tokenizers.ITokenizer;
-import com.hankcs.hanlp.classification.utilities.MathUtility;
+import com.hankcs.hanlp.utility.MathUtility;
 import com.hankcs.hanlp.classification.utilities.TextProcessUtility;
 
 import java.io.File;
 import java.io.IOException;
 import java.util.Map;
 
-import static com.hankcs.hanlp.classification.utilities.Predefine.logger;
+import static com.hankcs.hanlp.classification.utilities.io.ConsoleLogger.logger;
 
 /**
  * @author hankcs
